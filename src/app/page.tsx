@@ -12,16 +12,28 @@ export default function Dashboard() {
   // Setup sample token for demo if none exists
   useEffect(() => {
     const fetchToken = async () => {
-      const res = await fetch('/api/auth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@example.com', role: 'Admin' }),
-      });
-      const data = await res.json();
-      setToken(data.token);
-      // Simple decode (don't use in prod without library)
-      const payload = JSON.parse(atob(data.token.split('.')[1]));
-      setUser(payload);
+      try {
+        const res = await fetch('/api/auth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@fleetpulse.com', role: 'Admin' }),
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+          console.error('Auth error:', data.error);
+          return;
+        }
+        
+        if (data.token) {
+          setToken(data.token);
+          // Simple decode (don't use in prod without library)
+          const payload = JSON.parse(atob(data.token.split('.')[1]));
+          setUser(payload);
+        }
+      } catch (error) {
+        console.error('Failed to fetch token:', error);
+      }
     };
     fetchToken();
   }, []);

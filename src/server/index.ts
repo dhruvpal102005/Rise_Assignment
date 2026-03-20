@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import { startTcpServer } from './tcp';
 import { startWsServer } from './ws';
 import { ingester } from '@/lib/ingester';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
 
 async function main() {
   logger.info('Starting Fleet Pulse Standalone Servers...');
@@ -11,8 +11,8 @@ async function main() {
   ingester.start();
 
   // Start Servers
-  const tcpServer = startTcpServer();
-  const wsServer = startWsServer();
+  const tcpServer = await startTcpServer();
+  const wsServer = await startWsServer();
 
   // Graceful Shutdown
   const shutdown = async () => {
@@ -21,7 +21,6 @@ async function main() {
     tcpServer.close();
     wsServer.close();
     await ingester.stop();
-    await prisma.$disconnect();
     
     logger.info('Shutdown complete.');
     process.exit(0);

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { getAllDevices } from '@/lib/queries';
 import { headers } from 'next/headers';
 
 export async function GET() {
@@ -17,13 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const devices = await prisma.device.findMany({
-    include: {
-      customer: {
-        select: { email: true }
-      }
-    }
-  });
+  const allDevices = await getAllDevices();
 
-  return NextResponse.json(devices);
+  return NextResponse.json(allDevices);
 }

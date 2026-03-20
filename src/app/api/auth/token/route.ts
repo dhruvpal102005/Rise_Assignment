@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateToken } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { findUserByEmail } from '@/lib/queries';
 
 export async function POST(req: Request) {
   try {
@@ -10,13 +10,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email and role are required' }, { status: 400 });
     }
 
-    // Find the user in the DB to get their real ID
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await findUserByEmail(email);
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found. Please run: npm run db:seed' }, { status: 404 });
     }
 
     const token = generateToken({
@@ -26,7 +23,11 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ token });
-  } catch (err) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (err: any) {
+    console.error('Auth token error:', err);
+    return NextResponse.json({ 
+      error: 'Database connection failed. Please check DATABASE_URL in .env',
+      details: err.message 
+    }, { status: 500 });
   }
 }

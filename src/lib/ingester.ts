@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { batchInsertLocationLogs } from '@/lib/queries';
 import { logger } from '@/lib/logger';
 import { eventBus, EVENTS } from '@/lib/events';
 
@@ -48,20 +48,19 @@ class Ingester {
     this.buffer = [];
 
     try {
-      await prisma.locationLog.createMany({
-        data: itemsToProcess.map(item => ({
+      await batchInsertLocationLogs(
+        itemsToProcess.map(item => ({
           imei: item.imei,
           lat: item.lat,
           lng: item.lng,
           speed: item.speed,
           ignition: item.ignition,
           timestamp: new Date(item.timestamp),
-        })),
-      });
-      logger.info(`Batched ${itemsToProcess.length} location logs to DB.`);
+        }))
+      );
+      logger.info(`Batched ${itemsToProcess.length} location logs to database.`);
     } catch (err) {
       logger.error(err, 'Failed to batch insert location logs');
-      // Re-add to buffer for next attempt if needed, or handle failure
       this.buffer.unshift(...itemsToProcess);
     } finally {
       this.isProcessing = false;

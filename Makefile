@@ -1,33 +1,40 @@
-.PHONY: up down seed logsserver logsnapi logsdb help
+.PHONY: install setup db-push db-seed dev server clean
 
-help:
-	@echo "Fleet Pulse - Available Commands:"
-	@echo "  make up         Start all services (Docker + Next.js + TCP/WS)"
-	@echo "  make down       Stop all services"
-	@echo "  make seed       Initialize and seed the database"
-	@echo "  make server     Run the standalone TCP/WS server"
-	@echo "  make dev        Run the Next.js development server"
-	@echo "  make stress     Run the manual stress test (NC simulation)"
-
-up:
-	docker-compose up -d
+# Install dependencies
+install:
 	npm install
-	npx prisma generate
-	npm run dev & npm run server
 
-down:
-	docker-compose down
+# Setup: install deps + push schema + seed database
+setup: install db-push db-seed
+	@echo "✅ Setup complete! Run 'make dev' to start servers"
 
-seed:
-	npx prisma db push
+# Push database schema
+db-push:
+	npm run db:push
+
+# Seed database with test data
+db-seed:
 	npm run db:seed
 
-server:
-	npm run server
-
+# Start Next.js dev server (HTTP API + WebSocket)
 dev:
 	npm run dev
 
-stress:
-	@echo "Sending test ping..."
-	echo "PING,354678901234561,18.5204,73.8567,42.5,1" | nc localhost 5000
+# Start standalone TCP + WebSocket server
+server:
+	npm run server
+
+# Clean build artifacts
+clean:
+	rm -rf .next node_modules
+
+# Run all servers (requires separate terminals)
+help:
+	@echo "Available commands:"
+	@echo "  make install    - Install dependencies"
+	@echo "  make setup      - Full setup (install + db-push + seed)"
+	@echo "  make db-push    - Push database schema"
+	@echo "  make db-seed    - Seed database with test data"
+	@echo "  make dev        - Start Next.js dev server"
+	@echo "  make server     - Start TCP + WebSocket server"
+	@echo "  make clean      - Clean build artifacts"

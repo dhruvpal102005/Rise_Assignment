@@ -3,16 +3,16 @@ import { parse } from 'url';
 import { verifyToken, UserPayload } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { eventBus, EVENTS } from '@/lib/events';
-import { prisma } from '@/lib/prisma';
+import { getDevicesByCustomerId } from '@/lib/queries';
 
-const PORT = 8080;
+const PORT = parseInt(process.env.WS_PORT || '8080', 10);
 
 interface AuthenticatedSocket extends WebSocket {
   user?: UserPayload;
   assignedImeis?: Set<string>;
 }
 
-export function startWsServer() {
+export async function startWsServer() {
   const wss = new WebSocketServer({ port: PORT });
 
   wss.on('connection', async (ws: AuthenticatedSocket, req) => {
@@ -30,11 +30,8 @@ export function startWsServer() {
 
     // Cache assigned IMEIs for Customers
     if (user.role === 'Customer') {
-      const devices = await prisma.device.findMany({
-        where: { customerId: user.id },
-        select: { imei: true },
-      });
-      ws.assignedImeis = new Set(devices.map(d => d.imei));
+      const customerDevices = await getDevicesByCustomerId(user.id);
+      ws.assignedImeis = new Set(customerDevices.map((d) => d.imei));
     }
 
     ws.on('close', () => {

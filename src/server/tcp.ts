@@ -1,25 +1,25 @@
 import net from 'net';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
+import { getRegisteredDeviceImeis } from '@/lib/queries';
 import { eventBus, EVENTS } from '@/lib/events';
 
-const PORT = 5000;
+const PORT = parseInt(process.env.TCP_PORT || '5000', 10);
 
-// Simple memory cache for registered IMEI IDs (to avoid DB lookup on every ping if needed)
-// For this assignment, we'll fetch from DB or cache.
-const registeredDevices = new Set<string>();
+// Cache registered devices in memory for fast TCP validation
+let registeredDevices = new Set<string>();
 
 async function syncRegisteredDevices() {
-  const devices = await prisma.device.findMany({ select: { imei: true } });
-  registeredDevices.clear();
-  devices.forEach(d => registeredDevices.add(d.imei));
-  logger.info(`Loaded ${registeredDevices.size} registered devices from DB.`);
+  registeredDevices = await getRegisteredDeviceImeis();
+  logger.info(`Loaded ${registeredDevices.size} registered devices.`);
 }
 
 // Throttle map for "tracker:unknown" events
 const lastUnknownEmit = new Map<string, number>();
 
-export function startTcpServer() {
+export async function startTcpServer() {
+  // Load registered devices before starting server
+  await syncRegisteredDevices();
+
   const server = net.createServer((socket) => {
     let buffer = '';
 
@@ -87,9 +87,8 @@ export function startTcpServer() {
     });
   });
 
-  server.listen(PORT, '0.0.0.0', async () => {
+  server.listen(PORT, '0.0.0.0', () => {
     logger.info(`TCP Ingest Server listening on port ${PORT}`);
-    await syncRegisteredDevices();
   });
 
   return server;

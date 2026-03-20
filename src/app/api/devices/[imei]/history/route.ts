@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { findDeviceByImei, getLocationLogsByImei } from '@/lib/queries';
 import { headers } from 'next/headers';
 
 export async function GET(
   req: Request,
-  { params }: { params: { imei: string } }
+  { params }: { params: Promise<{ imei: string }> }
 ) {
   const { imei } = await params;
   const headersList = await headers();
@@ -21,9 +21,7 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const device = await prisma.device.findUnique({
-    where: { imei },
-  });
+  const device = await findDeviceByImei(imei);
 
   if (!device) {
     return NextResponse.json({ error: 'Device not found' }, { status: 404 });
@@ -34,11 +32,7 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const history = await prisma.locationLog.findMany({
-    where: { imei },
-    orderBy: { timestamp: 'desc' },
-    take: 100,
-  });
+  const history = await getLocationLogsByImei(imei, 100);
 
   return NextResponse.json(history);
 }

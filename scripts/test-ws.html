@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet Pulse WebSocket Test Client</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    h1 { color: #4ec9b0; }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .panel {
+      background: #252526;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #3e3e42;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      background: #3c3c3c;
+      border: 1px solid #555;
+      color: #d4d4d4;
+      border-radius: 3px;
+    }
+    button {
+      background: #0e639c;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover { background: #1177bb; }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #events {
+      height: 400px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      padding: 10px;
+      border: 1px solid #3e3e42;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .event {
+      margin: 5px 0;
+      padding: 8px;
+      border-left: 3px solid #4ec9b0;
+      background: #252526;
+    }
+    .event.unknown {
+      border-left-color: #f48771;
+    }
+    .status {
+      padding: 5px 10px;
+      border-radius: 3px;
+      display: inline-block;
+      margin: 5px 0;
+    }
+    .status.connected { background: #4ec9b0; color: #000; }
+    .status.disconnected { background: #f48771; color: #000; }
+    .timestamp { color: #858585; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>🚗 Fleet Pulse WebSocket Test Client</h1>
+  
+  <div class="container">
+    <div class="panel">
+      <h3>Connection</h3>
+      <label>API Base URL:</label>
+      <input type="text" id="apiUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
+      
+      <label>WebSocket URL:</label>
+      <input type="text" id="wsUrl" value="ws://localhost:8080" placeholder="ws://localhost:8080">
+      
+      <label>User Email:</label>
+      <select id="userEmail">
+        <option value="admin@example.com">admin@example.com (Admin)</option>
+        <option value="customer@example.com">customer@example.com (Customer)</option>
+      </select>
+      
+      <button id="connectBtn" onclick="connect()">Get Token & Connect</button>
+      <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+      
+      <div id="status" class="status disconnected">Disconnected</div>
+      <div id="tokenDisplay" style="word-break: break-all; font-size: 11px; margin-top: 10px;"></div>
+    </div>
+    
+    <div class="panel">
+      <h3>Statistics</h3>
+      <div>Total Events: <strong id="totalEvents">0</strong></div>
+      <div>Live Events: <strong id="liveEvents">0</strong></div>
+      <div>Unknown Events: <strong id="unknownEvents">0</strong></div>
+      <div>Connected Since: <strong id="connectedSince">-</strong></div>
+      <button onclick="clearEvents()" style="margin-top: 10px;">Clear Events</button>
+    </div>
+  </div>
+  
+  <div class="panel" style="margin-top: 20px;">
+    <h3>Live Events</h3>
+    <div id="events"></div>
+  </div>
+
+  <script>
+    let ws = null;
+    let token = null;
+    let stats = { total: 0, live: 0, unknown: 0 };
+    let connectedAt = null;
+
+    async function connect() {
+      const apiUrl = document.getElementById('apiUrl').value;
+      const wsUrl = document.getElementById('wsUrl').value;
+      const email = document.getElementById('userEmail').value;
+      const role = email.includes('admin') ? 'Admin' : 'Customer';
+
+      try {
+        // Get token
+        addEvent('system', 'Requesting JWT token...');
+        const res = await fetch(`${apiUrl}/api/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Token request failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+        token = data.token;
+        document.getElementById('tokenDisplay').textContent = `Token: ${token.substring(0, 50)}...`;
+        addEvent('system', `Token received for ${email}`);
+
+        // Connect WebSocket
+        addEvent('system', `Connecting to ${wsUrl}...`);
+        ws = new WebSocket(`${wsUrl}?token=${token}`);
+
+        ws.onopen = () => {
+          connectedAt = new Date();
+          document.getElementById('status').className = 'status connected';
+          document.getElementById('status').textContent = 'Connected';
+          document.getElementById('connectBtn').disabled = true;
+          document.getElementById('disconnectBtn').disabled = false;
+          document.getElementById('connectedSince').textContent = connectedAt.toLocaleTimeString();
+          addEvent('system', 'WebSocket connected successfully!');
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          stats.total++;
+          
+          if (data.event === 'tracker:live') {
+            stats.live++;
+            addEvent('live', JSON.stringify(data, null, 2));
+          } else if (data.event === 'tracker:unknown') {
+            stats.unknown++;
+            addEvent('unknown', JSON.stringify(data, null, 2));
+          }
+          
+          updateStats();
+        };
+
+        ws.onerror = (error) => {
+          addEvent('error', `WebSocket error: ${error.message || 'Unknown error'}`);
+        };
+
+        ws.onclose = () => {
+          document.getElementById('status').className = 'status disconnected';
+          document.getElementById('status').textContent = 'Disconnected';
+          document.getElementById('connectBtn').disabled = false;
+          document.getElementById('disconnectBtn').disabled = true;
+          addEvent('system', 'WebSocket disconnected');
+        };
+
+      } catch (error) {
+        addEvent('error', `Connection failed: ${error.message}`);
+      }
+    }
+
+    function disconnect() {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    }
+
+    function addEvent(type, message) {
+      const eventsDiv = document.getElementById('events');
+      const eventDiv = document.createElement('div');
+      eventDiv.className = `event ${type}`;
+      
+      const timestamp = new Date().toLocaleTimeString();
+      eventDiv.innerHTML = `
+        <div class="timestamp">[${timestamp}] ${type.toUpperCase()}</div>
+        <pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${message}</pre>
+      `;
+      
+      eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+      
+      // Keep only last 50 events
+      while (eventsDiv.children.length > 50) {
+        eventsDiv.removeChild(eventsDiv.lastChild);
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('totalEvents').textContent = stats.total;
+      document.getElementById('liveEvents').textContent = stats.live;
+      document.getElementById('unknownEvents').textContent = stats.unknown;
+    }
+
+    function clearEvents() {
+      document.getElementById('events').innerHTML = '';
+      stats = { total: 0, live: 0, unknown: 0 };
+      updateStats();
+    }
+
+    // Auto-scroll to top of events
+    setInterval(() => {
+      const eventsDiv = document.getElementById('events');
+      if (eventsDiv.scrollTop < 100) {
+        eventsDiv.scrollTop = 0;
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
