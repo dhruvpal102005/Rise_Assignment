@@ -8,7 +8,7 @@ async function demo() {
   const tokenRes = await fetch('http://localhost:3000/api/auth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@fleetpulse.com', role: 'Admin' })
+    body: JSON.stringify({ email: 'admin@fleetpulse.com', role: 'admin' })
   });
   const { token } = await tokenRes.json();
   console.log(`   ✅ Token: ${token.substring(0, 50)}...\n`);
@@ -18,16 +18,18 @@ async function demo() {
   const devicesRes = await fetch('http://localhost:3000/api/devices', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  const devices = await devicesRes.json();
+  const devicesData = await devicesRes.json();
+  const devices = Array.isArray(devicesData) ? devicesData : devicesData.devices || [];
   console.log(`   ✅ Found ${devices.length} devices:`);
   devices.forEach(d => console.log(`      - ${d.imei} (${d.vehicleNumber || 'No vehicle'})`));
 
   // 3. Get Device History
-  console.log('\n3️⃣ Getting history for device 354678901234561...');
-  const historyRes = await fetch('http://localhost:3000/api/devices/354678901234561/history', {
+  console.log('\n3️⃣ Getting history for device 123456789012345...');
+  const historyRes = await fetch('http://localhost:3000/api/devices/123456789012345/history', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  const history = await historyRes.json();
+  const historyData = await historyRes.json();
+  const history = Array.isArray(historyData) ? historyData : historyData.logs || [];
   console.log(`   ✅ Found ${history.length} location logs`);
   if (history.length > 0) {
     const latest = history[0];

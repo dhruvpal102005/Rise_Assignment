@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "echo 'Skipping Next.js build for standalone server'",
-    "start": "npm run server",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint",
     "db:up": "docker-compose up -d",
     "db:push": "drizzle-kit push",
