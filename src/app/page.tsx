@@ -39,17 +39,37 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || typeof window === 'undefined') return;
 
-    const ws = new WebSocket(`ws://localhost:8080?token=${token}`);
+    // Detect WebSocket URL based on environment
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' 
+      ? 'localhost:8080' 
+      : `${window.location.hostname}:8080`;
+    const wsUrl = `${wsProtocol}//${wsHost}?token=${token}`;
+
+    console.log('Connecting to WebSocket:', wsUrl);
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
+    ws.onopen = () => {
+      console.log('✅ WebSocket connected');
+    };
+
     ws.onmessage = (event) => {
+      console.log('📨 Received:', event.data);
       const data = JSON.parse(event.data);
       setLogs((prev) => [data, ...prev].slice(0, 100));
     };
 
-    ws.onerror = (error) => console.error('WS Error:', error);
+    ws.onerror = (error) => {
+      console.error('❌ WS Error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('🔌 WebSocket disconnected');
+    };
 
     return () => {
       ws.close();

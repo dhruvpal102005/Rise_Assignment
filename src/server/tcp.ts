@@ -66,6 +66,7 @@ export async function startTcpServer() {
 
           // Valid packet and registered device
           const timestamp = new Date().toISOString();
+          console.log('🔥 EMITTING TRACKER_LIVE:', { imei, lat, lng, speed });
           eventBus.emit(EVENTS.TRACKER_LIVE, {
             event: 'tracker:live',
             data: { imei, lat, lng, speed, ignition, timestamp },
