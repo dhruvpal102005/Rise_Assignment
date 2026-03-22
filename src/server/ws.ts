@@ -41,31 +41,26 @@ export async function startWsServer() {
 
   // Listen for internal events and broadcast
   eventBus.on(EVENTS.TRACKER_LIVE, (event) => {
-    console.log('📡 WS Server received TRACKER_LIVE:', event.data.imei);
     broadcast(event);
   });
 
   eventBus.on(EVENTS.TRACKER_UNKNOWN, (event) => {
-    console.log('📡 WS Server received TRACKER_UNKNOWN:', event.data.imei);
     broadcast(event);
   });
 
   function broadcast(event: any) {
     const message = JSON.stringify(event);
     const imei = event.data.imei;
-    console.log(`📢 Broadcasting to ${wss.clients.size} clients:`, imei);
 
     wss.clients.forEach((client: AuthenticatedSocket) => {
       if (client.readyState === WebSocket.OPEN && client.user) {
         // Admin sees all
         if (client.user.role === 'Admin') {
-          console.log(`  ✅ Sending to Admin: ${client.user.email}`);
           client.send(message);
         } 
         // Customer sees only their IMEIs
         else if (client.user.role === 'Customer') {
           if (client.assignedImeis?.has(imei)) {
-            console.log(`  ✅ Sending to Customer: ${client.user.email}`);
             client.send(message);
           }
         }
