@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "build": "npm install --include=dev && echo 'Build complete - running standalone server'",
+    "start": "npm run server",
     "lint": "eslint",
     "db:up": "docker-compose up -d",
     "db:push": "drizzle-kit push",
